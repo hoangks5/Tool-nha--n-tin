@@ -211,6 +211,11 @@ async def main(event):
                                               )
                 await client.send_file(GROUP_ID, 'file.xlsx')
                 os.remove('file.xlsx')
+            if 'group_id' in event.message.raw_text.lower():
+                value = ''.join(re.findall(r'\d', event.message.raw_text))
+                GROUP_ID = int(value)
+                await client.send_message(GROUP_ID,'Đổi thành công ID: '+str(GROUP_ID))
+            
         else:
             pass
 client.run_until_disconnected()
