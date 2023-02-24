@@ -1,3 +1,10 @@
+import openpyxl
+import os
+import random
+import pandas as pd
+import numpy as np
+import json
+
 from asyncio import events
 from os import name
 import re
@@ -13,209 +20,326 @@ from telethon.tl.functions.photos import UploadProfilePhotoRequest
 from telethon.tl.functions.account import UpdateProfileRequest
 import os
 from datetime import datetime
+
+
+def create_file(id_group):
+    
+    # Tạo một tệp Excel mới
+    workbook = openpyxl.Workbook()
+
+    # Lấy sheet đầu tiên của tệp Excel
+    sheet = workbook.active
+
+    # Thêm tiêu đề vào sheet
+    sheet['A1'] = 'Thời gian'
+    sheet['B1'] = 'Mã cộng'
+    sheet['C1'] = 'Tỷ giá'
+    sheet['D1'] = 'Thời gian'
+    sheet['E1'] = 'Mã trừ'
+    sheet['F1'] = 'Cần trả'
+    sheet['G1'] = 'Còn lại'
+    sheet['F2'] = 0
+    sheet['G2'] = 0
+
+
+
+
+
+    # Lưu tệp Excel
+    workbook.save('data/'+str(id_group)+'.xlsx')
+
+def convert_to_number(char):
+    # Convert character to uppercase
+    char = char.upper()
+    # Get Unicode code point for character
+    code = ord(char)
+    # Subtract Unicode code point for 'A' to get 1-based index
+    return code - ord('A') + 1
+
+def them_ma_cong(id_group,id_column,code):
+    workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
+
+    # Select active worksheet
+    worksheet = workbook.active
+
+    last_row = 1
+    for cell in worksheet[id_column]:
+        if cell.value is not None:
+            last_row += 1
+    worksheet.cell(row=last_row, column=convert_to_number(id_column)).value = code
+
+    # Save the changes
+    workbook.save('data/'+str(id_group)+'.xlsx')
+
+def tinh_toan(id_group):
+    # Đọc dữ liệu từ bảng tính Excel
+    df = pd.read_excel('data/'+str(id_group)+'.xlsx')
+
+    
+    column_b = df.iloc[:, 1].tolist()
+    matrix_b = np.array(column_b).reshape((-1, 1))
+    column_c = df.iloc[:, 2].tolist()
+    matrix_c = np.array(column_c).reshape((-1, 1))
+    column_d = df.iloc[:, 4].tolist()
+    matrix_d = np.array(column_d).reshape((-1, 1))
+    matrix_b = matrix_b[~np.isnan(matrix_b)].reshape(-1, 1)
+    matrix_c = matrix_c[~np.isnan(matrix_c)].reshape(-1, 1)
+    matrix_d = matrix_d[~np.isnan(matrix_d)].reshape(-1, 1)
+    column_e = df.iloc[:, 0].tolist()
+    matrix_e = np.array(column_e).reshape((-1, 1))
+    column_f = df.iloc[:, 3].tolist()
+    matrix_f = np.array(column_f).reshape((-1, 1))
+    try:
+        _tongnhap = sum(matrix_b*matrix_c)[0]
+    except TypeError:
+        _tongnhap = 0
+    try:
+        _trongtra = sum(matrix_d)[0]
+    except TypeError:
+        _trongtra = 0
+    _conlai =  _tongnhap - _trongtra
+
+    workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
+
+    worksheet = workbook.active
+    worksheet['F2'] = _tongnhap
+    worksheet['G2'] = _conlai
+    # Save the changes
+    workbook.save('data/'+str(id_group)+'.xlsx')
+    return {
+        'time_cong' : matrix_e,
+        'ma_cong': matrix_b,
+        'ty_gia' : matrix_c,
+        'time_tru' : matrix_f,
+        'ma_tru' : matrix_d,
+        'tong_nhap': _tongnhap,
+        'tong_tra': _trongtra,
+        'con_lai': _conlai
+    }
+
+def sua_ma_cong(id_group,stt,code):
+    workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
+
+    # Select active worksheet
+    worksheet = workbook.active
+
+    worksheet['B'+str(stt+1)] = code
+
+    # Save the changes
+    workbook.save('data/'+str(id_group)+'.xlsx')
+
+
+def sua_ma_nhan(id_group,stt,code):
+    workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
+
+    # Select active worksheet
+    worksheet = workbook.active
+
+    worksheet['E'+str(stt+1)] = code
+
+    # Save the changes
+    workbook.save('data/'+str(id_group)+'.xlsx')
+
+def update_admin(admin):
+    with open('data/admin.txt','w',encoding='utf-8') as f:
+        f.write('\n'.join(admin))
+        f.close()
+
+def update_group_id(id_group):
+    str_id = []
+    for id in id_group:
+        str_id.append(str(id))
+    with open('data/group_id.txt','w',encoding='utf-8') as f:
+        f.write('\n'.join(str_id))
+        f.close()
+
+
+def info_admin_group():
+    with open('data/admin.txt','r',encoding='utf-8') as f:
+        accmin = f.read().splitlines()
+    with open('data/group_id.txt','r',encoding='utf-8') as f:
+        grup = f.read().splitlines()
+    accminvc = []
+    grupvc = []
+    for i in accmin:
+        accminvc.append('@'+i)
+    for i in grup:
+        grupvc.append('https://web.telegram.org/z/#-'+i)
+    text = 'Danh sách admin:\n'+'\n'.join(accminvc)+'\n\nDanh sách group id:\n'+'\n'.join(grupvc)
+    return text    
+
+
+def info():
+    code_chat = {
+        'Bắt Đầu' : 'Reset vào tạo 1 phiên giao dịch mới',
+        'vnd 2345' : 'Thiết lập tỷ giá VND = 2345',
+        '+2000' : 'Thêm 1 mã nhập 2000',
+        '-2000' : 'Thêm một lệnh trừ VND 2000',
+        'sửa mã 1 = 2000' : 'Sửa mã nhập thứ 1 thành 2000',
+        'sửa vnd 1 = 2000' : 'Sửa mã trừ thứ 1 thành 2000',
+        'xuất file': 'Xuất ra file excel',
+        'admin@hoangkss5' : 'Thêm @hoangkss5 làm admin',
+        'deladmin@hoangkss5': 'Xoá @hoangkss5 khỏi danh sách admin',
+        'id 122412414': 'Thêm id group 122412414 vào danh sách group làm việc',
+        'delid 122412414' : 'Xoá id group 122412414 khỏi danh sách group làm việc'
+    }
+    mess = []
+    for key in list(code_chat.keys()):
+        mess.append('<b>'+key+'</b>  :  '+code_chat[key])
+    return '\n'.join(mess)
 api_id = 8759328 
 api_hash = '1a270788cb618993f54f514f5a8c93c4'
-import pandas as pd
 
-admin = ['hoangkss5','RuanMengXiong']
-GROUP_ID = -868013328
+ADMIN = []
+ID_GROUP = []
 
-#GROUP_ID = 'hoangkss5'
-import_code = []
-vnd_import_code = []
-
-ty_gia = 1000
-ty_gia_vnd = 2000
-ty_le = 0
-def vnd_total_import_code(*args):
-    total = args[0]
-    res = 0
-    for i in total:
-        res += int(i.split('/')[1])
-    return res
-def code_to_string(*args):
-    strings = []
-    count = 1
-    for i in args[0]:
-        row = '['+str(count)+'] <i>'+i.split('/')[0] +'</i> : <b>'+i.split('/')[1]+'</b> * '+str(ty_gia_vnd)+ ' = '+str("{:,}".format(int(i.split('/')[1])*ty_gia_vnd))
-        strings.append(row)
-        count +=1
-    return '\n'.join(strings)
-def vnd_code_to_string(*args):
-    strings = []
-    count = 1
-    for i in args[0]:
-        row = '['+str(count)+'] <i>'+i.split('/')[0] +'</i> : <b>'+str("{:,}".format(int(i.split('/')[1])))+'</b>'
-        strings.append(row)
-        count +=1
-    return '\n'.join(strings)
-def total_import_code(*args):
-    total = args[0]
-    res = 0
-    for i in total:
-        res += int(i.split('/')[1])
-    return str(res)
-def total_import_code_vnd(*args):
-    total = args[0]
-    res = 0
-    for i in total:
-        res += int(i.split('/')[1])
-    res *= ty_gia_vnd
-    return res
+with open('data/admin.txt','r',encoding='utf-8') as f:
+    ADMIN = f.read().splitlines()
+with open('data/group_id.txt','r',encoding='utf-8') as f:
+    for id in f.read().splitlines():
+        ID_GROUP.append(int(id))
+try:
+    with open('data/tygia.json') as f:
+        ty_gia_vnd = json.load(f)
+except:
+    ty_gia_vnd = {}
 
 
-def xuat_file(import_code,vnd_import_code,ty_gia_vnd):
-    time =[]
-    time1 =[]
-    value =[]
-    value1 = []
-    gia_tien = []
-    for i in import_code:
-        time.append(i.split('/')[0])
-        value.append(i.split('/')[1])
-        gia_tien.append(int(i.split('/')[1])*ty_gia_vnd)
-    for j in vnd_import_code:
-        time1.append(j.split('/')[0])
-        value1.append(j.split('/')[1])
-        
-    can_tra = [total_import_code_vnd(import_code)]
-    con_lai = [total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)]
-    n_rows = max(len(time), len(time1))
-    ty_gia = [ty_gia_vnd] * n_rows
-    can_tra += [pd.NaT] * (n_rows - len(can_tra))
-    con_lai += [pd.NaT] * (n_rows - len(con_lai))
-    time += [pd.NaT] * (n_rows - len(time))
-    gia_tien += [pd.NaT] * (n_rows - len(gia_tien))
-    time1 += [pd.NaT] * (n_rows - len(time1))
-    value += [pd.NaT] * (n_rows - len(value))
-    value1 += [pd.NaT] * (n_rows - len(value1))
-    print(con_lai)
-    print(can_tra)
-    print(gia_tien)
-    
-    df = pd.DataFrame({
-        'Thời gian nhập mã': time,
-        'Nhập mã': value,
-        'Tỷ giá VND': ty_gia,
-        'VND': gia_tien,
-        'Thời gian nhận tiền': time1,
-        'Nhận tiền': value1,
-        'Cần trả': can_tra,
-        'Còn lại': con_lai
-    })
-    
-    df.to_excel("file.xlsx", index=True)
-    return 'Xuất file thành công'
+def update_ty_gia(ty_gia):
+    with open('data/tygia.json', 'w') as outfile:
+        json.dump(ty_gia, outfile)
 
 
-client = TelegramClient('+84377820120', api_id, api_hash).start()
+def messager_text(id_group):
+    text = tinh_toan(id_group)
+    cout = 0
+    text_ma_cong = []
+    for i in text['ma_cong']:
+        text_ma_cong.append('<b>['+str(cout+1)+']</b> <i>'+str(text['time_cong'][cout][0]) +'</i> : <b>'+str(i[0]) + '</b> * ' + str(text['ty_gia'][cout][0])+' = ' + str("{:,}".format(int(i[0]*text['ty_gia'][cout][0])))       )
+        cout += 1
+    t1 = 'Tổng mã nhập: '+str(cout)+' mã\n' + '\n'.join(text_ma_cong)
+    cout = 0
+    text_ma_tru = []
+    for i in text['ma_tru']:
+        text_ma_tru.append('<b>['+str(cout+1)+']</b> <i>'+str(text['time_tru'][cout][0]) +'</i> : '+str("{:,}".format(int(i[0]))))
+        cout += 1
+    t2 = 'Tổng mã trừ: '+str(cout)+' mã\n' + '\n'.join(text_ma_tru)
+    can_tra = int(text['tong_nhap'])
+    con_lai = int(text['con_lai'])
+    return t1+'\n\n\n'+t2+'\n\n\nCần trả: <b>'+str("{:,}".format(can_tra))+'</b>\nCòn lại: <b>'+str("{:,}".format(con_lai))+'</b>'
+
+client = TelegramClient('admin', api_id, api_hash).start()
 @client.on(events.NewMessage())
 async def main(event):
-        global ty_gia, ty_gia_vnd, ty_le, import_code, vnd_import_code, admin, GROUP_ID
-        sender = await event.get_sender()
-        if sender.username in admin:
-            if 'đặt tỷ lệ' in event.message.raw_text.lower():
-                number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
-                if number == '':
-                    number = ''.join(re.findall(r'\d', event.message.raw_text))
-                await client.send_message(GROUP_ID,'Đặt tỷ lệ '+number+'%')
-                ty_le=int(number)
-                
-                
-            if event.message.raw_text == 'Bắt Đầu':
-                await client.send_message(GROUP_ID,'Bắt Đầu Ghi Giao Dịch Mới')
-                import_code = []
-                vnd_import_code = []
+    global ty_gia_vnd, ADMIN, ID_GROUP
+    try:
+        group = await event.get_chat()
+    except:
+        pass
+    message = event.message
+    sender = await message.get_sender()
+    sender_username = sender.username
+    if group.id in ID_GROUP and sender_username in ADMIN:
+
+        if event.message.raw_text == 'Bắt Đầu':
+            await client.send_message(group.id,'Bắt Đầu Ghi Giao Dịch Mới')
+            create_file(group.id)
+
+
+        if 'vnd' == event.message.raw_text.lower().split(' ')[0]:
+            number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
+            if number == '':
+                number = ''.join(re.findall(r'\d', event.message.raw_text))
+            await client.send_message(group.id,'Thiết lập tỷ giá VND '+number)
+            ty_gia_vnd.update({str(group.id):int(number)})
+            update_ty_gia(ty_gia=ty_gia_vnd)
+
+        if 'id' == event.message.raw_text.lower().split(' ')[0]:
+            number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
+            if number == '':
+                number = ''.join(re.findall(r'\d', event.message.raw_text))
+            await client.send_message(group.id,'Thêm id gruop: '+number)
+            ID_GROUP.append(int(number))
+            update_group_id(ID_GROUP)
+        if 'delid' == event.message.raw_text.lower().split(' ')[0]:
+            number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
+            if number == '':
+                number = ''.join(re.findall(r'\d', event.message.raw_text))
+            ID_GROUP.remove(int(number))
+            await client.send_message(group.id,'Xoá id gruop: '+number)
+            update_group_id(ID_GROUP)
+
+
+        if 'admin' == event.message.raw_text.lower().split('@')[0]:
+            username = event.message.raw_text.lower().split('@')[1]
+            ADMIN.append(username)
+            await client.send_message(group.id,'Thêm admin @'+username)
+            update_admin(ADMIN)
+
+        if 'deladmin' == event.message.raw_text.lower().split('@')[0]:
+            username = event.message.raw_text.lower().split('@')[1]
+            ADMIN.remove(username)
+            await client.send_message(group.id,'Xoá admin @'+username)
+            update_admin(ADMIN)
+
+        
             
             
-            if 'thêm quản lý' in event.message.raw_text.lower():
-                admin.append(event.message.raw_text.split('@')[1])
-                await client.send_message(GROUP_ID,'Thêm quản lý @'+event.message.raw_text.split('@')[1])
-            if 'xóa quản lý' in event.message.raw_text.lower():
-                admin.append(event.message.raw_text.split('@')[1])
-                await client.send_message(GROUP_ID,'Xoá quản lý @'+event.message.raw_text.split('@')[1])
+
+
+
+
+
+        if event.message.raw_text[0] == '+':
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
+            if number == '':
+                number = ''.join(re.findall(r'\d', event.message.raw_text))
+
+            them_ma_cong(group.id,'A',current_time)
+            them_ma_cong(group.id,'B',number)
+            them_ma_cong(group.id,'C',ty_gia_vnd[str(group.id)])
+            await client.send_message(group.id,messager_text(group.id)+'\n\nTỷ giá VND: <b>'+str(ty_gia_vnd[str(group.id)])+'</b>',parse_mode='html')
+
             
-            
-            if 'thiết lập tỷ giá bằng' in event.message.raw_text.lower():
-                number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
-                if number == '':
-                    number = ''.join(re.findall(r'\d', event.message.raw_text))
-                await client.send_message(GROUP_ID,'Thiết lập tỷ giá bằng '+number)
-                ty_gia=int(number)
-                
-                
-            if 'thiết lập tỷ giá vnd' in event.message.raw_text.lower():
-                number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
-                if number == '':
-                    number = ''.join(re.findall(r'\d', event.message.raw_text))
-                await client.send_message(GROUP_ID,'Thiết lập tỷ giá VND '+number)
-                ty_gia_vnd=int(number)
-                
-            
-            if event.message.raw_text[0] == '+':
-                   
-                    now = datetime.now()
-                    current_time = now.strftime("%H:%M:%S")
-                    number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
-                    if number == '':
-                        number = ''.join(re.findall(r'\d', event.message.raw_text))
-                    import_code.append(current_time+'/'+number)
-                    msg =   "<b>Nhập mã ("+str(len(import_code))+" mã)</b>\n"+code_to_string(import_code)+"\n\n<b>Nhận tiền ("+str(len(vnd_import_code))+" mã)</b>\n"+vnd_code_to_string(vnd_import_code)+"\n\nTổng nhập mã: <b>"+total_import_code(import_code)+"</b>\nPhí đổi: <b>"+str(ty_le)+"%</b>\nTỷ giá VND: <b>"+str(ty_gia_vnd)+"</b>\n\nCần trả: <b>"+str("{:,}".format(total_import_code_vnd(import_code)))+"</b> VND\n"+"Còn lại: <b>"+str("{:,}".format(total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)))+"</b> VND"
-                    await client.send_message(GROUP_ID,message=msg,parse_mode='html')
-            if event.message.raw_text[0] == '-':
-    
-                    now = datetime.now()
-                    current_time = now.strftime("%H:%M:%S")
-                    number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
-                    if number == '':
-                        number = ''.join(re.findall(r'\d', event.message.raw_text))
-                    vnd_import_code.append(current_time+'/'+number)
-                    msg =   "<b>Nhập mã ("+str(len(import_code))+" mã)</b>\n"+code_to_string(import_code)+"\n\n<b>Nhận tiền ("+str(len(vnd_import_code))+" mã)</b>\n"+vnd_code_to_string(vnd_import_code)+"\n\nTổng nhập mã: <b>"+total_import_code(import_code)+"</b>\nPhí đổi: <b>"+str(ty_le)+"%</b>\nTỷ giá VND: <b>"+str(ty_gia_vnd)+"</b>\n\nCần trả: <b>"+str("{:,}".format(total_import_code_vnd(import_code)))+"</b> VND\n"+"Còn lại: <b>"+str("{:,}".format(total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)))+"</b> VND"
-                    await client.send_message(GROUP_ID,message=msg,parse_mode='html')
-                    
-            if 'sửa mã' in event.message.raw_text.lower().split('=')[0]:
-                number = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[0]))
-                value = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text.lower().split('=')[1]))
-                if value == '':
-                    value = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[1]))
-                await client.send_message(GROUP_ID,'Sửa thành công mã '+number+' = '+value)     
-                import_code[int(number)-1] = import_code[int(number)-1].split('/')[0]+'/'+value
-                msg =   "<b>Nhập mã ("+str(len(import_code))+" mã)</b>\n"+code_to_string(import_code)+"\n\n<b>Nhận tiền ("+str(len(vnd_import_code))+" mã)</b>\n"+vnd_code_to_string(vnd_import_code)+"\n\nTổng nhập mã: <b>"+total_import_code(import_code)+"</b>\nPhí đổi: <b>"+str(ty_le)+"%</b>\nTỷ giá VND: <b>"+str(ty_gia_vnd)+"</b>\n\nCần trả: <b>"+str("{:,}".format(total_import_code_vnd(import_code)))+"</b> VND\n"+"Còn lại: <b>"+str("{:,}".format(total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)))+"</b> VND"
-                await client.send_message(GROUP_ID,message=msg,parse_mode='html')
-                
-            if 'xóa mã' in event.message.raw_text.lower():
-                value = ''.join(re.findall(r'\d', event.message.raw_text))
-                await client.send_message(GROUP_ID,'Xóa thành công mã '+value)     
-                import_code.pop(int(value)-1)
-                msg =   "<b>Nhập mã ("+str(len(import_code))+" mã)</b>\n"+code_to_string(import_code)+"\n\n<b>Nhận tiền ("+str(len(vnd_import_code))+" mã)</b>\n"+vnd_code_to_string(vnd_import_code)+"\n\nTổng nhập mã: <b>"+total_import_code(import_code)+"</b>\nPhí đổi: <b>"+str(ty_le)+"%</b>\nTỷ giá VND: <b>"+str(ty_gia_vnd)+"</b>\n\nCần trả: <b>"+str("{:,}".format(total_import_code_vnd(import_code)))+"</b> VND\n"+"Còn lại: <b>"+str("{:,}".format(total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)))+"</b> VND"
-                await client.send_message(GROUP_ID,message=msg,parse_mode='html')
-                
-            if 'sửa vnd' in event.message.raw_text.lower().split('=')[0]:
-                number = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[0]))
-                value = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text.lower().split('=')[1]))
-                if value == '':
-                    value = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[1]))
-                await client.send_message(GROUP_ID,'Sửa thành công mã '+number+' = '+value)     
-                vnd_import_code[int(number)-1] = import_code[int(number)-1].split('/')[0]+'/'+value
-                msg =   "<b>Nhập mã ("+str(len(import_code))+" mã)</b>\n"+code_to_string(import_code)+"\n\n<b>Nhận tiền ("+str(len(vnd_import_code))+" mã)</b>\n"+vnd_code_to_string(vnd_import_code)+"\n\nTổng nhập mã: <b>"+total_import_code(import_code)+"</b>\nPhí đổi: <b>"+str(ty_le)+"%</b>\nTỷ giá VND: <b>"+str(ty_gia_vnd)+"</b>\n\nCần trả: <b>"+str("{:,}".format(total_import_code_vnd(import_code)))+"</b> VND\n"+"Còn lại: <b>"+str("{:,}".format(total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)))+"</b> VND"
-                await client.send_message(GROUP_ID,message=msg,parse_mode='html')
-                
-            if 'xóa vnd' in event.message.raw_text.lower():
-                value = ''.join(re.findall(r'\d', event.message.raw_text))
-                await client.send_message(GROUP_ID,'Xóa thành công mã '+value)     
-                vnd_import_code.pop(int(value)-1)
-                msg =   "<b>Nhập mã ("+str(len(import_code))+" mã)</b>\n"+code_to_string(import_code)+"\n\n<b>Nhận tiền ("+str(len(vnd_import_code))+" mã)</b>\n"+vnd_code_to_string(vnd_import_code)+"\n\nTổng nhập mã: <b>"+total_import_code(import_code)+"</b>\nPhí đổi: <b>"+str(ty_le)+"%</b>\nTỷ giá VND: <b>"+str(ty_gia_vnd)+"</b>\n\nCần trả: <b>"+str("{:,}".format(total_import_code_vnd(import_code)))+"</b> VND\n"+"Còn lại: <b>"+str("{:,}".format(total_import_code_vnd(import_code)-vnd_total_import_code(vnd_import_code)))+"</b> VND"
-                await client.send_message(GROUP_ID,message=msg,parse_mode='html')
-            if event.message.raw_text.lower() == 'xuất file':
-                await client.send_message(GROUP_ID,xuat_file(import_code, vnd_import_code,ty_gia_vnd)
-                                              )
-                await client.send_file(GROUP_ID, 'file.xlsx')
-                os.remove('file.xlsx')
-            if 'group_id' in event.message.raw_text.lower():
-                value = ''.join(re.findall(r'\d', event.message.raw_text))
-                GROUP_ID = int(value)
-                await client.send_message(GROUP_ID,'Đổi thành công ID: '+str(GROUP_ID))
-            
-        else:
-            pass
+        if event.message.raw_text[0] == '-':
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            number = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text))
+            if number == '':
+                number = ''.join(re.findall(r'\d', event.message.raw_text))
+
+            them_ma_cong(group.id,'D',current_time)
+            them_ma_cong(group.id,'E',number)
+            await client.send_message(group.id,messager_text(group.id)+'\n\nTỷ giá VND: <b>'+str(ty_gia_vnd[str(group.id)])+'</b>',parse_mode='html')
+
+        if 'sửa mã' in event.message.raw_text.lower().split('=')[0]:
+            number = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[0]))
+            value = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text.lower().split('=')[1]))
+            if value == '':
+                value = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[1]))
+            sua_ma_cong(group.id,int(number),int(value))
+            await client.send_message(group.id,messager_text(group.id)+'\n\nTỷ giá VND: <b>'+str(ty_gia_vnd[str(group.id)])+'</b>',parse_mode='html')
+
+
+        if 'sửa vnd' in event.message.raw_text.lower().split('=')[0]:
+            number = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[0]))
+            value = ''.join(re.findall(r'\d+\.\d+', event.message.raw_text.lower().split('=')[1]))
+            if value == '':
+                value = ''.join(re.findall(r'\d', event.message.raw_text.lower().split('=')[1]))
+            sua_ma_nhan(group.id,int(number),int(value))
+            await client.send_message(group.id,messager_text(group.id)+'\n\nTỷ giá VND: <b>'+str(ty_gia_vnd[str(group.id)])+'</b>',parse_mode='html')
+
+
+
+        if 'xuất file' == event.message.raw_text.lower():
+            await client.send_file(group.id,'data/'+str(group.id)+'.xlsx')
+
+        if 'hdsd' == event.message.raw_text.lower():
+            await client.send_message(group.id,info(),parse_mode='html')
+            await client.send_message(group.id,info_admin_group(),parse_mode='html')
+
+
+
 client.run_until_disconnected()
