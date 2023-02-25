@@ -270,8 +270,8 @@ async def main(event):
             update_group_id(ID_GROUP)
 
 
-        if 'admin' == event.message.raw_text.lower().split('@')[0]:
-            username = event.message.raw_text.lower().split('@')[1]
+        if 'admin' == event.message.raw_text.split('@')[0]:
+            username = event.message.raw_text.split('@')[1]
             ADMIN.append(username)
             await client.send_message(group.id,'Thêm admin @'+username)
             update_admin(ADMIN)
