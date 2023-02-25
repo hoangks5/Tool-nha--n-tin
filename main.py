@@ -47,6 +47,7 @@ def create_file(id_group):
 
     # Lưu tệp Excel
     workbook.save('data/'+str(id_group)+'.xlsx')
+    workbook.close()
 
 def convert_to_number(char):
     # Convert character to uppercase
@@ -70,6 +71,7 @@ def them_ma_cong(id_group,id_column,code):
 
     # Save the changes
     workbook.save('data/'+str(id_group)+'.xlsx')
+    workbook.close()
 
 def tinh_toan(id_group):
     # Đọc dữ liệu từ bảng tính Excel
@@ -98,6 +100,8 @@ def tinh_toan(id_group):
     except TypeError:
         _trongtra = 0
     _conlai =  _tongnhap - _trongtra
+    
+    
 
     workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
 
@@ -106,6 +110,7 @@ def tinh_toan(id_group):
     worksheet['G2'] = _conlai
     # Save the changes
     workbook.save('data/'+str(id_group)+'.xlsx')
+    workbook.close()
     return {
         'time_cong' : matrix_e,
         'ma_cong': matrix_b,
@@ -116,6 +121,7 @@ def tinh_toan(id_group):
         'tong_tra': _trongtra,
         'con_lai': _conlai
     }
+    
 
 def sua_ma_cong(id_group,stt,code):
     workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
@@ -127,7 +133,7 @@ def sua_ma_cong(id_group,stt,code):
 
     # Save the changes
     workbook.save('data/'+str(id_group)+'.xlsx')
-
+    workbook.close()
 
 def sua_ma_nhan(id_group,stt,code):
     workbook = openpyxl.load_workbook('data/'+str(id_group)+'.xlsx')
@@ -139,6 +145,7 @@ def sua_ma_nhan(id_group,stt,code):
 
     # Save the changes
     workbook.save('data/'+str(id_group)+'.xlsx')
+    workbook.close()
 
 def update_admin(admin):
     with open('data/admin.txt','w',encoding='utf-8') as f:
