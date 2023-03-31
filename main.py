@@ -1,24 +1,11 @@
 import openpyxl
-import os
-import random
 import pandas as pd
 import numpy as np
 import json
 
 from asyncio import events
-from os import name
 import re
-from telethon import TelegramClient, events, hints, types
-from telethon.tl.functions.channels import JoinChannelRequest
-import time
-from telethon.tl.types import InputPeerChat
-from telethon.tl.functions.messages import SendMessageRequest
-import random
-from telethon.tl.types import messages
-from telethon.tl.functions.account import UpdateUsernameRequest
-from telethon.tl.functions.photos import UploadProfilePhotoRequest
-from telethon.tl.functions.account import UpdateProfileRequest
-import os
+from telethon import TelegramClient, events
 from datetime import datetime
 
 
@@ -222,7 +209,7 @@ def messager_text(id_group):
     cout = 0
     text_ma_cong = []
     for i in text['ma_cong']:
-        text_ma_cong.append('<b>['+str(cout+1)+']</b> <i>'+str(text['time_cong'][cout][0]) +'</i> : <b>'+str(i[0]) + '</b> * ' + str(text['ty_gia'][cout][0])+' = ' + str("{:,}".format(int(i[0]*text['ty_gia'][cout][0])))       )
+        text_ma_cong.append('<b>['+str(cout+1)+']</b> <i>'+str(text['time_cong'][cout][0]) +'</i> : <b>'+str(i[0]) + '</b> * ' + str(text['ty_gia'][cout][0])+' = ' + str("{:,}".format(round(i[0]*text['ty_gia'][cout][0])))       )
         cout += 1
     t1 = 'Tổng mã nhập: '+str(cout)+' mã\n' + '\n'.join(text_ma_cong)
     cout = 0
